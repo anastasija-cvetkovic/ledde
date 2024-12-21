@@ -4,6 +4,7 @@ namespace LEDDE.Library.LED
 {
     public class LEDMatrix
     {
+        //an array instead of a matrix for faster access
         private readonly LEDPixel[] _matrix;
         public int Width { get; set; }
         public int Height { get; set; }
