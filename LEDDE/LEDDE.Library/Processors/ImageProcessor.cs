@@ -11,6 +11,8 @@ namespace LEDDE.Library.Processors
     {
         public static LEDMatrix LoadImage(string imagePath)
         {
+            Validator.ValidateResource(imagePath, "image");
+
             Image<Rgba32> image = Image.Load<Rgba32>(imagePath);
 
             return Renderer.ToLEDMatrix(image);
@@ -53,16 +55,12 @@ namespace LEDDE.Library.Processors
             return scaledMatrix;
         }
 
-        public static LEDMatrix ProcessImage(string imagePath, int newWidth, int newHeight)
+        public static LEDMatrix ProcessImage(LEDMatrix loadedMatrix, int newWidth, int newHeight)
         {
             if (newWidth <= 0 || newHeight <= 0)
             {
                 throw new ArgumentException("Matrix dimensions must be greater than zero");
             }
-
-            Validator.ValidateResource(imagePath, "image");
-
-            LEDMatrix loadedMatrix = LoadImage(imagePath);
 
             LEDMatrix scaledMatrix = ScaleLEDMatrix(loadedMatrix,newWidth,newHeight,ScalingAlgorithms.NearestNeighborInterpolate);
 
