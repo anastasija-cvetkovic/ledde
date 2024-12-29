@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LEDDE.UI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="850" d:DesignHeight="450"
+        x:Class="LEDDE.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="LEDDE.UI">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+	<Grid RowDefinitions="*,Auto,30">
+		<!-- prikaz za LED displej -->
+		<Border Grid.Row="0" Background="#1e1e1e" BorderBrush="#444" BorderThickness="2" Margin="10">
+			<Image Name="LedDisplayView" Stretch="Uniform"/>
+		</Border>
+		<!-- oblast za kontrole -->
+		<StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5" Spacing="10" HorizontalAlignment="Center">
+			<Button Name="LoadFileButton" Content="LoadFile" Background="#555" Click="LoadFileButton_Click" />
+			
+			<Label Margin="0,5,0,0">Width:</Label>
+			<TextBox Name="WidthInput"  Width="80"/>
+			<Label Margin="0,5,0,0">Height:</Label>
+			<TextBox Name="HeightInput"  Width="80"/>
+			<ComboBox Name="ScalingAlgorithmSelector" Width="220" SelectedIndex="0">
+				<ComboBoxItem Content="Select a Scaling Algorithm" IsEnabled="False" />
+				<ComboBoxItem Content="Nearest Neighbor"/>
+				<ComboBoxItem Content="Bilinear"/>
+				<ComboBoxItem Content="Bicubic"/>
+			</ComboBox>
+			
+			<Button Name="StartSimulationButton" Content="Simulate" Background="#0f9d58" Foreground="White"/>
+
+			<Button Name="ExportAsciiButton" Content="Export to ASCII" Background="#4285f4" Foreground="White" />
+			
+		</StackPanel>
+
+		<StackPanel Grid.Row="2" Orientation="Horizontal" Background="#5e5e5e" Spacing="10">
+			<TextBlock Name="LoadedResourceText" Text="Loaded Resource Name" VerticalAlignment="Center" Margin="10,0,0,0"/>
+			<TextBlock Name="MatrixResolutionText" Text="MxN" VerticalAlignment="Center" Margin="10,0"/>
+			<ProgressBar Name="ProgressBar" Width="100" Height="20" Minimum="0" Maximum="100" Margin="10,0,0,0"/>
+			<TextBlock Name="StatusText" Text="Ready" VerticalAlignment="Center" />
+		</StackPanel>
+		
+	</Grid>
+
+
+</Window>
