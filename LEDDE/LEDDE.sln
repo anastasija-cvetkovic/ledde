@@ -5,6 +5,8 @@ VisualStudioVersion = 17.12.35527.113
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LEDDE.Library", "LEDDE.Library\LEDDE.Library.csproj", "{E42BF4E3-C620-478B-889C-4867E7E131CD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LEDDE.UI", "LEDDE.UI\LEDDE.UI.csproj", "{52DE4432-2136-47F2-8050-1AB849473A0E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{E42BF4E3-C620-478B-889C-4867E7E131CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E42BF4E3-C620-478B-889C-4867E7E131CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E42BF4E3-C620-478B-889C-4867E7E131CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52DE4432-2136-47F2-8050-1AB849473A0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52DE4432-2136-47F2-8050-1AB849473A0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52DE4432-2136-47F2-8050-1AB849473A0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52DE4432-2136-47F2-8050-1AB849473A0E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

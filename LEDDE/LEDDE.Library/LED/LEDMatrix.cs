@@ -15,7 +15,7 @@ namespace LEDDE.Library.LED
             Height = height;
             _matrix = new LEDPixel[Width * Height];
 
-            //InitializePixels();
+            InitializePixels();
         }
 
         private void InitializePixels()

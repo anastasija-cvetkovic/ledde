@@ -22,6 +22,12 @@ namespace LEDDE.Library.Validators
                 throw new FileNotFoundException($"{resourceType} file not found.", resourcePath);
             }
 
+            // Validacija tipa resursa
+            if (resourceType != "image" && resourceType != "video")
+            {
+                throw new ArgumentException("Invalid resource type specified.", nameof(resourceType));
+            }
+
             // Validacija na osnovu tipa resursa
             if (resourceType == "image" && !LEDConstants.INPUT_IMAGE_FORMATS.Contains(extension))
             {
@@ -30,10 +36,6 @@ namespace LEDDE.Library.Validators
             else if (resourceType == "video" && !LEDConstants.INPUT_VIDEO_FORMATS.Contains(extension))
             {
                 throw new NotSupportedException($"Unsupported video format: {extension}");
-            }
-            else
-            {
-                throw new ArgumentException("Invalid resource type specified.", nameof(resourceType));
             }
         }
         /*
