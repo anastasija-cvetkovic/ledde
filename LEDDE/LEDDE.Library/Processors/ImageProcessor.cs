@@ -46,7 +46,7 @@ namespace LEDDE.Library.Processors
                     Rgba32 c10 = x + 1 < originalWidth ? originalMatrix.GetPixelColor(x + 1, y) : c00;
                     Rgba32 c01 = y + 1 < originalHeight ? originalMatrix.GetPixelColor(x, y + 1) : c00;
                     Rgba32 c11 = (x + 1 < originalWidth && y + 1 < originalHeight) ?
-                        originalMatrix.GetPixelColor(x + 1, y + 1) : c00;
+                          originalMatrix.GetPixelColor(x + 1, y + 1) : c00;
 
                     Rgba32 interpolatedColor = interpolationAlgorithm(c00, c10, c01, c11, dx, dy);
                     scaledMatrix.SetPixelColor(newX, newY, interpolatedColor);

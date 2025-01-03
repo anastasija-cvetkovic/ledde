@@ -1,6 +1,7 @@
 ﻿using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using LEDDE.Library.Processors;
+using System.Drawing;
 
 namespace LEDDE.Library.LED
 {

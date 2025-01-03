@@ -3,7 +3,7 @@
         xmlns:vm="using:LEDDE.UI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="850" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="950" d:DesignHeight="450"
         x:Class="LEDDE.UI.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
@@ -21,8 +21,9 @@
 			<Image Name="LedDisplayView" Stretch="Uniform"/>
 		</Border>
 		<!-- oblast za kontrole -->
-		<StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5" Spacing="10" HorizontalAlignment="Center">
-			<Button Name="LoadFileButton" Content="LoadFile" Background="#555" Click="LoadFileButton_Click" />
+		<StackPanel Grid.Row="1" Orientation="Horizontal"  Spacing="10" HorizontalAlignment="Center" Margin="0,0,0,10">
+			
+			<Button Name="LoadFileButton" Content="LoadFile" Background="#5e5e5e" Foreground="White" Click="LoadFileButton_Click" />
 			
 			<Label Margin="0,5,0,0">Width:</Label>
 			<TextBox Name="WidthInput"  Width="80"/>
@@ -35,9 +36,16 @@
 				<ComboBoxItem Content="Bicubic"/>
 			</ComboBox>
 			
-			<Button Name="StartSimulationButton" Content="Simulate" Background="#0f9d58" Foreground="White"/>
+			<Button Name="StartSimulationButton" Content="Simulate" Click="StartSimulationButton_Click"
+					Background="#0f9d58" Foreground="White" />
 
 			<Button Name="ExportAsciiButton" Content="Export to ASCII" Background="#4285f4" Foreground="White" />
+
+			<!--  theme toggle 
+			<Button Name="ThemeToggleButton">
+				<Image Name="ThemeImage" Width="20" Height="20" />
+			</Button>
+			-->
 			
 		</StackPanel>
 

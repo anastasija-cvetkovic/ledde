@@ -25,7 +25,7 @@ namespace LEDDE.Library.LED
                 _matrix[i] = new LEDPixel();
             }
         }
-        private int GetIndex(int x, int y)
+        public int GetIndex(int x, int y)
         {
             return y * Width + x;
         }
@@ -45,11 +45,14 @@ namespace LEDDE.Library.LED
         }
         public Rgba32 GetPixelColor(int x, int y)
         {
-            if (x < 0 || x >= Width)
+            if (x < 0 || x >= Width) 
+            {
                 throw new ArgumentOutOfRangeException(nameof(x), "The x coordinate is out of bounds.");
-            if (y < 0 || y >= Height)
-                throw new ArgumentOutOfRangeException(nameof(y), "The y coordinate is out of bounds.");
+            }
+            if (y < 0 || y >= Height) {
 
+                throw new ArgumentOutOfRangeException(nameof(y), "The y coordinate is out of bounds.");
+            }   
             int index = GetIndex(x, y);
             return _matrix[index].Color;
         }
