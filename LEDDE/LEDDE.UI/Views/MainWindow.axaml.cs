@@ -76,6 +76,18 @@ namespace LEDDE.UI.Views
             Bitmap bitmap = ToAvaloniaBitmap(_ledMatrix);
 
             LedDisplayView.Source = bitmap;
+
+            /* Ensure the image is displayed proportionally
+            LedDisplayView.Stretch = Avalonia.Media.Stretch.Uniform;*/
+
+            // Set the size of the LedDisplayView to the image's actual size if it is smaller
+            LedDisplayView.Width = Math.Min(newWidth, LedDisplayView.MaxWidth);
+            LedDisplayView.Height = Math.Min(newHeight, LedDisplayView.MaxHeight);
+
+            // Optional: Center the image
+            LedDisplayView.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            LedDisplayView.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+
             MatrixResolutionText.Text = WidthInput.Text + "x" + HeightInput.Text;
             StatusText.Text = "Simulation completed!";
         }
