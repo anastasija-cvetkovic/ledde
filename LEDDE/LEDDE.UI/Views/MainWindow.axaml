@@ -25,7 +25,8 @@
 		<!-- oblast za kontrole -->
 		<StackPanel Grid.Row="1" Orientation="Horizontal"  Spacing="10" HorizontalAlignment="Center" Margin="0,0,0,10">
 			
-			<Button Name="LoadFileButton" Content="LoadFile" Background="#5e5e5e" Foreground="White" Click="LoadFileButton_Click" />
+			<Button Name="LoadFileButton" Content="LoadFile" Click="LoadFileButton_Click"
+					Background="#5D4B8F" Foreground="White" />
 			
 			<Label Margin="0,5,0,0">Width:</Label>
 			<TextBox Name="WidthInput"  Width="80"/>
@@ -43,18 +44,18 @@
 
 			<Button Name="ExportAsciiButton" Content="Export to ASCII" Background="#4285f4" Foreground="White" />
 
-			<!--  theme toggle 
-			<Button Name="ThemeToggleButton">
-				<Image Name="ThemeImage" Width="20" Height="20" />
-			</Button>
+			<!--
+			<Button Name="ThemeToggleButton" Click="ChangeTheme_Click" 
+					Content="Toggle Theme" Background="#5D4B8F" Foreground="White"/>
 			-->
-			
+
 		</StackPanel>
 
 		<StackPanel Grid.Row="2" Orientation="Horizontal" Background="#5e5e5e" Spacing="10">
 			<TextBlock Name="LoadedResourceText" Text="Loaded Resource Name" VerticalAlignment="Center" Margin="10,0,0,0"/>
 			<TextBlock Name="MatrixResolutionText" Text="MxN" VerticalAlignment="Center" Margin="10,0"/>
-			<ProgressBar Name="ProgressBar" Width="100" Height="20" Minimum="0" Maximum="100" Margin="10,0,0,0"/>
+			<ProgressBar Name="ProgressBar" Foreground="#32234F"
+						 Width="100" Height="20" Minimum="0" Maximum="100" Margin="10,0,0,0"/>
 			<TextBlock Name="StatusText" Text="Ready" VerticalAlignment="Center" />
 		</StackPanel>
 		

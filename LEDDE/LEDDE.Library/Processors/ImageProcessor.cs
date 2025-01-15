@@ -62,7 +62,7 @@ namespace LEDDE.Library.Processors
                 throw new ArgumentException("Matrix dimensions must be greater than zero");
             }
 
-            LEDMatrix scaledMatrix = ScaleLEDMatrix(loadedMatrix,newWidth,newHeight,ScalingAlgorithms.NearestNeighborInterpolate);
+            LEDMatrix scaledMatrix = ScaleLEDMatrix(loadedMatrix,newWidth,newHeight,ScalingAlgorithms.BilinearInterpolate);
 
             return scaledMatrix;
         }

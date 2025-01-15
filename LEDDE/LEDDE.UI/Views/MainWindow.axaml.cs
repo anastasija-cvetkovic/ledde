@@ -6,13 +6,17 @@ using System.IO;
 using LEDDE.Library.LED;
 using Avalonia.Media.Imaging;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace LEDDE.UI.Views
 {
     public partial class MainWindow : Window
     {
 
-        private LEDMatrix _ledMatrix;
+        private LEDMatrix? _image;
+        private List<LEDMatrix>? _videoFrames;
 
         public MainWindow()
         {
@@ -20,44 +24,83 @@ namespace LEDDE.UI.Views
 
         }
 
-
         private async void LoadFileButton_Click(object sender, RoutedEventArgs e)
         {
-            if(this.StorageProvider is null)
+            if (this.StorageProvider is null)
             {
                 return;
             }
+
             var result = await this.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Select an Image File",
+                Title = "Select an Image or Video File",
                 FileTypeFilter = new[]
                 {
-                    new FilePickerFileType("Image Files")
-                    {
-                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp" }
-                    }
-                },
+            new FilePickerFileType("Image and Video Files")
+            {
+                Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp","*.avi" }
+            }
+        },
                 AllowMultiple = false
             });
+
             if (result.Count > 0)
             {
+                ProgressBar.Value = 0; // Reset progress bar
+                StatusText.Text = "Loading file...";
+
                 string filePath = result[0].Path.LocalPath;
                 string fileName = Path.GetFileName(filePath);
 
-                _ledMatrix = ImageProcessor.LoadImage(filePath);
+                await Task.Run(async () =>
+                {
+                    if (Path.GetExtension(filePath).Equals(".avi", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Start a background task to delay the status update
+                        _ = Task.Delay(2000).ContinueWith(_ =>
+                        {
+                            // Update the status after the delay, ensuring it's on the UI thread
+                            Dispatcher.UIThread.InvokeAsync(() => StatusText.Text = "Extracting frames...");
+                        });
 
-                MatrixResolutionText.Text =_ledMatrix.Width+"x"+_ledMatrix.Height;
-                LoadedResourceText.Text = fileName;
+                        _videoFrames = VideoProcessor.LoadVideo(filePath, progress =>
+                        {
+                            // Update the progress bar on the UI thread
+                            Dispatcher.UIThread.InvokeAsync(() => ProgressBar.Value = progress);
+                        });
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            MatrixResolutionText.Text = _videoFrames[0].Width + "x" + _videoFrames[0].Height;
+                        });
+
+                        _image = null;
+                    }
+                    else
+                    {
+                        _image = ImageProcessor.LoadImage(filePath);
+
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            MatrixResolutionText.Text = _image.Width + "x" + _image.Height;
+                            ProgressBar.Value = 75;
+                        });
+
+                        _videoFrames = null;
+                    }
+
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        StatusText.Text = "File loaded. Ready to simulate!";
+                        LoadedResourceText.Text = fileName;
+                        ProgressBar.Value = 100;
+                    });
+                });
             }
         }
-    
-        private void StartSimulationButton_Click(object sender, RoutedEventArgs e)
+
+        private async void StartSimulationButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_ledMatrix == null)
-            {
-                StatusText.Text = "No image loaded to simulate!";
-                return;
-            }
             // Retrieve the new width and height from the text boxes
             if (!int.TryParse(WidthInput.Text, out int newWidth))
             {
@@ -71,70 +114,192 @@ namespace LEDDE.UI.Views
                 return;
             }
 
-            _ledMatrix = ImageProcessor.ProcessImage(_ledMatrix,newWidth,newHeight);
+            if (_image == null && _videoFrames == null)
+            {
+                StatusText.Text = "No file to simulate!";
+                return;
+            }
 
-            Bitmap bitmap = ToAvaloniaBitmap(_ledMatrix);
+            if (_image != null)
+            {
+                // Update status immediately before starting the simulation
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText.Text = "Simulating image...";
+                    ProgressBar.Value = 0; // Reset progress bar
+                });
 
-            LedDisplayView.Source = bitmap;
+                _image = ImageProcessor.ProcessImage(_image, newWidth, newHeight);
 
-            /* Ensure the image is displayed proportionally
-            LedDisplayView.Stretch = Avalonia.Media.Stretch.Uniform;*/
+                LedDisplayView.Source = ToAvaloniaBitmap(_image);
+                LedDisplayView.Width = Math.Min(newWidth, LedDisplayView.MaxWidth);
+                LedDisplayView.Height = Math.Min(newHeight, LedDisplayView.MaxHeight);
+                LedDisplayView.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+                LedDisplayView.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
 
-            // Set the size of the LedDisplayView to the image's actual size if it is smaller
-            LedDisplayView.Width = Math.Min(newWidth, LedDisplayView.MaxWidth);
-            LedDisplayView.Height = Math.Min(newHeight, LedDisplayView.MaxHeight);
 
-            // Optional: Center the image
-            LedDisplayView.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
-            LedDisplayView.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+                MatrixResolutionText.Text = $"{newWidth}x{newHeight}";
 
-            MatrixResolutionText.Text = WidthInput.Text + "x" + HeightInput.Text;
-            StatusText.Text = "Simulation completed!";
+                StatusText.Text = "Image simulation completed!";
+            }
+
+            if (_videoFrames != null)
+            {
+                // Update status immediately before starting the scaling process
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText.Text = "Scaling video...";
+                    ProgressBar.Value = 0; // Reset progress bar
+                });
+
+                // Perform the scaling operation on a background thread
+                await Task.Run(() =>
+                {
+                    _videoFrames = VideoProcessor.ScaleVideo(_videoFrames, newWidth, newHeight, progress =>
+                    {
+                        // Update the progress bar on the UI thread
+                        Dispatcher.UIThread.InvokeAsync(() => ProgressBar.Value = progress);
+                    });
+                });
+
+                // Once scaling is done, update the status text and reset progress bar
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText.Text = "Simulating video...";
+                    ProgressBar.Value = 0;  // Reset progress bar to 0
+                });
+
+                // Run the simulation asynchronously so the UI is updated without blocking
+                await Task.Run(async () =>
+                {
+                    int totalFrames = _videoFrames.Count;
+                    int currentFrame = 0;
+
+                    foreach (var frame in _videoFrames)
+                    {
+                        // Convert the processed LEDMatrix frame to an Avalonia Bitmap
+                        var bitmap = ToAvaloniaBitmap(frame);
+
+                        // Update the UI in the main thread
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            LedDisplayView.Source = bitmap;
+                            LedDisplayView.Width = Math.Min(newWidth, LedDisplayView.MaxWidth);
+                            LedDisplayView.Height = Math.Min(newHeight, LedDisplayView.MaxHeight);
+                            LedDisplayView.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+                            LedDisplayView.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+                            MatrixResolutionText.Text = $"{newWidth}x{newHeight}";
+
+                            // update the progress bar
+                            int progress = (int)((currentFrame + 1) / (float)totalFrames * 100);
+                            ProgressBar.Value = progress;  // Update the progress bar value
+                        });
+
+                        currentFrame++;
+
+                        // Optionally, add a small delay to simulate frame rate
+                        await Task.Delay(50);  // Adjust this delay to simulate frame rate
+                    }
+
+                    // Update status after the video is done
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        StatusText.Text = "Video simulation completed!";
+                    });
+                });
+            }
         }
 
         public Bitmap ToAvaloniaBitmap(LEDMatrix ledMatrix)
         {
-
             int width = ledMatrix.Width;
             int height = ledMatrix.Height;
 
             // Create a WriteableBitmap with the matrix dimensions
             var bitmap = new WriteableBitmap(new Avalonia.PixelSize(width, height), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888);
 
-            
+            using (var lockedBuffer = bitmap.Lock())
+            {
+                int bytesPerPixel = 4; // BGRA8888 format = 4 bytes per pixel
+                int stride = width * bytesPerPixel;
+
+                unsafe
+                {
+                    byte* buffer = (byte*)lockedBuffer.Address;
+
+                    // Parallelize row processing
+                    Parallel.For(0, height, y =>
+                    {
+                        // Pointer to the start of the row in the buffer
+                        byte* rowPtr = buffer + y * stride;
+
+                        for (int x = 0; x < width; x++)
+                        {
+                            var color = ledMatrix.GetPixelColor(x, y);
+
+                            // Calculate the offset for this pixel (BGRA order)
+                            int index = x * bytesPerPixel;
+                            rowPtr[index + 0] = color.B; // Blue
+                            rowPtr[index + 1] = color.G; // Green
+                            rowPtr[index + 2] = color.R; // Red
+                            rowPtr[index + 3] = color.A; // Alpha
+                        }
+                    });
+                }
+            }
+
+            return bitmap;
+        }
+        public Bitmap ToAvaloniaBitmap_WITHPIXELSIZE(LEDMatrix ledMatrix, int pixelSize = 20)
+        {
+
+            int width = ledMatrix.Width * pixelSize;
+            int height = ledMatrix.Height * pixelSize;
+
+            // Create a WriteableBitmap with the scaled dimensions
+            var bitmap = new WriteableBitmap(new Avalonia.PixelSize(width, height), new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888);
 
             using (var lockedBuffer = bitmap.Lock())
             {
                 int bytesPerPixel = 4; // BGRA8888 format = 4 bytes per pixel
                 int stride = width * bytesPerPixel;
-                byte[] pixelData = new byte[height * stride];
 
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        var color = ledMatrix.GetPixelColor(x, y);
-
-                        int index = ledMatrix.GetIndex(x,y) * bytesPerPixel;
-
-                        // BGRA order for Avalonia
-                        pixelData[index + 0] = color.B; // Blue
-                        pixelData[index + 1] = color.G; // Green
-                        pixelData[index + 2] = color.R; // Red
-                        pixelData[index + 3] = color.A; // Alpha
-                    }
-                }
-
-                // Copy the pixel data into the WriteableBitmap
                 unsafe
                 {
-                    fixed (byte* srcPtr = pixelData)
+                    byte* buffer = (byte*)lockedBuffer.Address;
+
+                    // Parallelize the loop over rows
+                    Parallel.For(0, ledMatrix.Height, y =>
                     {
-                        Buffer.MemoryCopy(srcPtr, (void*)lockedBuffer.Address, pixelData.Length, pixelData.Length);
-                    }
+                        for (int x = 0; x < ledMatrix.Width; x++)
+                        {
+                            var color = ledMatrix.GetPixelColor(x, y);
+
+                            // Fill the larger "pixel block"
+                            for (int py = 0; py < pixelSize; py++)
+                            {
+                                int pixelRowStart = ((y * pixelSize) + py) * stride;
+                                for (int px = 0; px < pixelSize; px++)
+                                {
+                                    int pixelX = (x * pixelSize + px) * bytesPerPixel;
+                                    int index = pixelRowStart + pixelX;
+
+                                    buffer[index + 0] = color.B; // Blue
+                                    buffer[index + 1] = color.G; // Green
+                                    buffer[index + 2] = color.R; // Red
+                                    buffer[index + 3] = color.A; // Alpha
+                                }
+                            }
+                        }
+                    });
                 }
             }
             return bitmap;
+        }
+    
+        private async void ChangeTheme_Click(object sender, RoutedEventArgs e)
+        {
+            
         }
     }
 }
