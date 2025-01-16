@@ -49,11 +49,8 @@ namespace LEDDE.Library.Processors
 
                     frameNumber++;
 
-
-                    // Calculate the progress as a percentage
                     int progress = (int)((frameNumber / (float)totalFrames) * 100);
 
-                    // Update the progress bar via the callback, if it's provided
                     progressCallback?.Invoke(progress);
 
                     Logger.Log($"Frame number incremented - {frameNumber}");
@@ -65,34 +62,23 @@ namespace LEDDE.Library.Processors
 
         public static List<LEDMatrix> ScaleVideo(List<LEDMatrix> matrix, int newWidth, int newHeight, Action<int> progressCallback)
         {
-            // Initialize FFmpeg only once
             InitializeFFmpeg();
 
             int progress=0;
 
-            // Use Parallel.ForEach to process frames concurrently
             Parallel.ForEach(matrix, (frame, state, index) =>
             {
-                // Scale the frame using the ScaleLEDMatrix method
                 LEDMatrix scaledFrame = ImageProcessor.ScaleLEDMatrix(frame, newWidth, newHeight, ScalingAlgorithms.NearestNeighborInterpolate);
 
-                // Update the frame in the list
                 matrix[(int)index] = scaledFrame;
 
-                // Calculate the progress as a percentage
                 progress = (int)((index + 1) / (float)matrix.Count * 100);
 
-                // Update the progress bar via the callback, if it's provided
                 progressCallback?.Invoke(progress);
 
             });
 
             return matrix;
-        }
-
-        public static void ProcessVideo(List<LEDMatrix> matrix, int newWidth, int newHeight)
-        {
-            
         }
 
         #region maybe

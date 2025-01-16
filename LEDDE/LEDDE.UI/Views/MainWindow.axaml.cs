@@ -21,7 +21,6 @@ namespace LEDDE.UI.Views
         public MainWindow()
         {
             InitializeComponent();
-
         }
 
         private async void LoadFileButton_Click(object sender, RoutedEventArgs e)
