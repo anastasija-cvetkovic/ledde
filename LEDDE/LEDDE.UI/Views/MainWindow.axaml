@@ -42,7 +42,8 @@
 			<Button Name="StartSimulationButton" Content="Simulate" Click="StartSimulationButton_Click"
 					Background="#0f9d58" Foreground="White" />
 
-			<Button Name="ExportAsciiButton" Content="Export to ASCII" Background="#4285f4" Foreground="White" />
+			<Button Name="ExportAsciiButton" Click="ExportLEDMatrix_Click"
+					Content="Export to ASCII" Background="#4285f4" Foreground="White" />
 
 			<!--
 			<Button Name="ThemeToggleButton" Click="ChangeTheme_Click" 

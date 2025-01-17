@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Avalonia.Logging;
 
 namespace LEDDE.UI.Views
 {
@@ -209,6 +210,112 @@ namespace LEDDE.UI.Views
             }
         }
 
+
+        private async void ExportLEDMatrix_Click(object sender, RoutedEventArgs e)
+        {
+            if(_image != null)
+            {
+                if (this.StorageProvider == null)
+                {
+                    StatusText.Text = "Storage provider is not available.";
+                    return;
+                }
+                // Step 1: Open folder picker dialog
+                var folderPickerResult = await this.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Folder to Save File",
+                    AllowMultiple = false
+                });
+
+                if (folderPickerResult.Count == 0)
+                {
+                    // User canceled folder selection
+                    StatusText.Text = "Export canceled.";
+                    return;
+                }
+
+                string selectedFolder = folderPickerResult[0].Path.LocalPath;
+
+                // Step 2: Generate the file name
+                string fileName = $"{LoadedResourceText.Text}_{MatrixResolutionText.Text}.txt";
+
+                // Step 3: Save the LEDMatrix object as an ASCII file
+                string filePath = Path.Combine(selectedFolder, fileName);
+
+                await Task.Run(() =>
+                {
+                    _image.SaveAsASCII(selectedFolder, fileName);
+                });
+
+                // Notify the user that the file has been saved
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    StatusText.Text = $"File has been exported to: {filePath}";
+                });
+
+            }
+            else if(_videoFrames != null)
+            {
+                if (this.StorageProvider == null)
+                {
+                    StatusText.Text = "Storage provider is not available.";
+                    return;
+                }
+
+                // Open folder picker dialog
+                var folderPickerResult = await this.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Select Folder to Save Frames",
+                    AllowMultiple = false
+                });
+
+                if (folderPickerResult.Count == 0)
+                {
+                    // User canceled folder selection
+                    StatusText.Text = "Export canceled.";
+                    return;
+                }
+
+                string selectedFolder = folderPickerResult[0].Path.LocalPath;
+
+                // Create a folder with the video's name to store frames
+                string videoFolderName = LoadedResourceText.Text+"_"+MatrixResolutionText.Text;
+                string framesFolder = Path.Combine(selectedFolder, videoFolderName);
+
+                try
+                {
+                    // Ensure the folder exists
+                    Directory.CreateDirectory(framesFolder);
+
+                    // Save each frame as ASCII in parallel
+                    await Task.Run(async () =>
+                    {
+                        var tasks = new List<Task>();
+                        for (int i = 0; i < _videoFrames.Count; i++)
+                        {
+                            int frameIndex = i; // Avoid closure issues
+                            tasks.Add(Task.Run(() =>
+                            {
+                                string frameFileName = $"Frame_{frameIndex + 1}.txt";
+                                _videoFrames[frameIndex].SaveAsASCII(framesFolder, frameFileName);
+                            }));
+                        }
+
+                        await Task.WhenAll(tasks);
+                    });
+
+                    StatusText.Text = $"Frames have been exported to: {framesFolder}";
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = $"Error exporting frames: {ex.Message}";
+                }
+            }
+
+        }
+        
+
+        #region helper methods
         public Bitmap ToAvaloniaBitmap(LEDMatrix ledMatrix)
         {
             int width = ledMatrix.Width;
@@ -300,5 +407,6 @@ namespace LEDDE.UI.Views
         {
             
         }
+        #endregion
     }
 }

@@ -14,28 +14,25 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                var current = Environment.CurrentDirectory;
-                var probe = Path.Combine("LEDDE.Library", "FFmpeg");
+                var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-                while (current != null)
+                var ffmpegBinaryPath = Path.Combine(baseDirectory, "../../../../../LEDDE.Library/FFmpeg");
+                ffmpegBinaryPath = Path.GetFullPath(ffmpegBinaryPath); 
+
+                if (Directory.Exists(ffmpegBinaryPath))
                 {
-                    //Check if the FFmpeg directory exists
-                    var ffmpegBinaryPath = Path.Combine(current, probe);
-
-                    if (Directory.Exists(ffmpegBinaryPath))
-                    {
-                        Console.WriteLine($"FFmpeg binaries found in: {ffmpegBinaryPath}");
-                        Environment.SetEnvironmentVariable("PATH", $"{ffmpegBinaryPath};{Environment.GetEnvironmentVariable("PATH")}");
-                        ffmpeg.RootPath = ffmpegBinaryPath;
-                        return;
-                    }
-
-                    current = Directory.GetParent(current)?.FullName;
+                    Environment.SetEnvironmentVariable("PATH", $"{ffmpegBinaryPath};{Environment.GetEnvironmentVariable("PATH")}");
+                    ffmpeg.RootPath = ffmpegBinaryPath;
                 }
-                throw new DirectoryNotFoundException("FFmpeg binaries not found in the expected solution root directory.");
+                else
+                {
+                    throw new DirectoryNotFoundException($"FFmpeg binaries not found in: {ffmpegBinaryPath}");
+                }
             }
             else
+            {
                 throw new NotSupportedException("This platform is not supported. Please add support for other platforms as needed.");
+            }
         }
     }
 }
