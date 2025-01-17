@@ -15,7 +15,7 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 var current = Environment.CurrentDirectory;
-                var probe = "FFmpeg";
+                var probe = Path.Combine("LEDDE.Library", "FFmpeg");
 
                 while (current != null)
                 {

@@ -1,6 +1,7 @@
 ﻿using FFmpeg.AutoGen;
 using LEDDE.Library.LED;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Runtime.InteropServices;
 
 namespace LEDDE.Library.Processors.AutoGenHelpers
 {
@@ -18,6 +19,9 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
         private AVBufferRef* _hwDeviceContext = null;
 
         private byte* _yuv420pBuffer;
+
+        private unsafe delegate AVPixelFormat GetFormatDelegate(AVCodecContext* ctx, AVPixelFormat* fmt);
+
 
         public VideoFileReader(string videoPath, AVHWDeviceType hwDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2)
         {
@@ -172,9 +176,41 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
                 Logger.Log("Hardware acceleration not supported for this codec, falling back to software decoding.");
             }
 
+            //_codecContext->get_format = GetFormatCallback;
+
             if (ffmpeg.avcodec_open2(_codecContext, _codec, null) < 0)
                 throw new InvalidOperationException("Failed to open codec.");
         }
+
+        private static AVPixelFormat[] GetPixelFormats(AVPixelFormat* fmt)
+        {
+            var formats = new List<AVPixelFormat>();
+            while (*fmt != AVPixelFormat.AV_PIX_FMT_NONE)
+            {
+                formats.Add(*fmt);
+                fmt++;
+            }
+            return formats.ToArray();
+        }
+
+        private static AVPixelFormat GetFormatCallback(AVCodecContext* ctx, AVPixelFormat* fmt)
+        {
+            var formats = GetPixelFormats(fmt); // Convert the format array
+            Logger.Log($"Available pixel formats: {string.Join(", ", formats)}");
+
+            foreach (var format in formats)
+            {
+                if (format == AVPixelFormat.AV_PIX_FMT_NV12) // Hardware-accelerated format
+                {
+                    Logger.Log("Selecting hardware-accelerated pixel format: AV_PIX_FMT_NV12");
+                    return AVPixelFormat.AV_PIX_FMT_NV12;
+                }
+            }
+
+            Logger.Log("No hardware-accelerated pixel format found. Falling back to default.");
+            return formats[0];
+        }
+
         private bool EnableHardwareAcceleration(AVHWDeviceType hwDeviceType)
         {
             AVHWDeviceType[] availableDeviceTypes = {
@@ -185,17 +221,20 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             AVHWDeviceType.AV_HWDEVICE_TYPE_QSV,   // Intel Quick Sync (QSV)
             AVHWDeviceType.AV_HWDEVICE_TYPE_OPENCL, // OpenCL (cross-platform)
             };
-            fixed (AVBufferRef** hwDeviceContextPtr = &_hwDeviceContext)
+            foreach (var deviceType in availableDeviceTypes)
             {
-                if (ffmpeg.av_hwdevice_ctx_create(hwDeviceContextPtr, hwDeviceType, null, null, 0) < 0)
+                fixed (AVBufferRef** hwDeviceContextPtr = &_hwDeviceContext)
                 {
-                    Logger.Log("Failed to create hardware device context.");
-                    return false;
+                    if (ffmpeg.av_hwdevice_ctx_create(hwDeviceContextPtr, deviceType, null, null, 0) >= 0)
+                    {
+                        Logger.Log($"Hardware acceleration enabled using {deviceType}.");
+                        _codecContext->hw_device_ctx = ffmpeg.av_buffer_ref(_hwDeviceContext);
+                        return true; // Success, hardware acceleration enabled.
+                    }
                 }
             }
-
-            _codecContext->hw_device_ctx = ffmpeg.av_buffer_ref(_hwDeviceContext);
-            return true;
+            Logger.Log("Hardware acceleration not supported.");
+            return false; // Failed, hardware acceleration not available.
         }
         private void AllocateFrameAndPacket()
         {
@@ -228,6 +267,8 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
                     continue;
                 else if (receiveFrameResult < 0)
                     return false;
+
+                Logger.Log($"Frame received with format: {(AVPixelFormat)_frame->format}");
 
                 if (_frame->format == (int)AVPixelFormat.AV_PIX_FMT_NV12)
                 {

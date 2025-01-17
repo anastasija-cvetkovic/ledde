@@ -1,9 +1,6 @@
 ﻿using FFmpeg.AutoGen;
 using LEDDE.Library.LED;
 using LEDDE.Library.Scaling;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
-using System.Runtime.InteropServices;
 using LEDDE.Library.Processors.AutoGenHelpers;
 
 namespace LEDDE.Library.Processors
