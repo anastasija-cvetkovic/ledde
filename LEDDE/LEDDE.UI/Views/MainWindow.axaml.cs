@@ -210,7 +210,6 @@ namespace LEDDE.UI.Views
             }
         }
 
-
         private async void ExportLEDMatrix_Click(object sender, RoutedEventArgs e)
         {
             if(_image != null)
@@ -314,7 +313,6 @@ namespace LEDDE.UI.Views
 
         }
         
-
         #region helper methods
         public Bitmap ToAvaloniaBitmap(LEDMatrix ledMatrix)
         {

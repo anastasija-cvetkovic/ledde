@@ -23,36 +23,63 @@ namespace LEDDE.Library.Processors
         {
             InitializeFFmpeg();
 
-            List<LEDMatrix> videoMatrix = [];
+            var videoMatrix = new List<LEDMatrix>();
+            int totalFrames = 0;
+            int processedFrames = 0;
 
-            // Open video file
             using (var videoFile = new VideoFileReader(videoPath))
             {
                 Logger.Log($"Video file opened - {videoPath}.");
-                //string videoFileName = Path.GetFileNameWithoutExtension(videoPath);
-                //string outputFolder = Path.Combine(Directory.GetCurrentDirectory(), videoFileName);
-                //Directory.CreateDirectory(outputFolder);
+                totalFrames = (int)videoFile.FrameCount;
 
-                int frameNumber = 0;
-                int totalFrames = (int)videoFile.FrameCount;
+                var frameTasks = new List<Task>();
+                int processorCount = Environment.ProcessorCount;
+                SemaphoreSlim semaphore = new(processorCount); // Adjust as needed for parallelism
 
+                // Timer to update progress periodically
+                var progressUpdateTask = Task.Run(async () =>
+                {
+                    while (processedFrames < totalFrames)
+                    {
+                        int progress = (int)((processedFrames / (float)totalFrames) * 100);
+                        progressCallback?.Invoke(progress);
+                        await Task.Delay(800); // Update progress every second
+                    }
+                });
+
+                // Parallel frame processing
                 while (videoFile.ReadNextFrame(out var frame))
                 {
-                    Logger.Log($"Starting to read frame - {frame}");
+                    frameTasks.Add(Task.Run(async () =>
+                    {
+                        await semaphore.WaitAsync();
+                        try
+                        {
+                            // Process frame and add to the list
+                            lock (videoMatrix)
+                            {
+                                videoMatrix.Add(frame);
+                            }
 
-                    videoMatrix.Add(frame);
-
-                    Logger.Log($"Frame added - {frame}");
-
-                    frameNumber++;
-
-                    int progress = (int)((frameNumber / (float)totalFrames) * 100);
-
-                    progressCallback?.Invoke(progress);
-
-                    Logger.Log($"Frame number incremented - {frameNumber}");
+                            // Increment processed frame count
+                            Interlocked.Increment(ref processedFrames);
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    }));
                 }
+
+                // Wait for all frame processing to complete
+                Task.WhenAll(frameTasks).Wait();
+
+                // Wait for the progress update task to finish
+                progressUpdateTask.Wait();
             }
+
+            // Ensure final progress is reported as 100%
+            progressCallback?.Invoke(100);
 
             return videoMatrix;
         }
@@ -106,8 +133,6 @@ namespace LEDDE.Library.Processors
         #endregion
 
         #region old methods
-        
-       
         public static void ProcessVideoOld(string videoPath)
         {
             // Initialize FFmpeg libraries
