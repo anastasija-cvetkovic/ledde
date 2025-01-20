@@ -43,7 +43,7 @@ namespace LEDDE.Library.Processors
                     {
                         int progress = (int)((processedFrames / (float)totalFrames) * 100);
                         progressCallback?.Invoke(progress);
-                        await Task.Delay(800); // Update progress every second
+                        await Task.Delay(500); // Update progress every second
                     }
                 });
 
@@ -113,7 +113,7 @@ namespace LEDDE.Library.Processors
         {
             InitializeFFmpeg();
 
-            using (var videoFile = new VideoFileReader(videoPath, AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA))
+            using (var videoFile = new VideoFileReader(videoPath))
             {
                 while (videoFile.ReadNextFrame(out var frame))
                 {
@@ -139,7 +139,7 @@ namespace LEDDE.Library.Processors
             InitializeFFmpeg();
 
             // Open video file
-            using (var videoFile = new VideoFileReader(videoPath, AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA))
+            using (var videoFile = new VideoFileReader(videoPath))
             {
                 string videoFileName = Path.GetFileNameWithoutExtension(videoPath);
                 string outputFolder = Path.Combine(Directory.GetCurrentDirectory(), videoFileName);

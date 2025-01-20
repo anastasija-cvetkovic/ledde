@@ -9,140 +9,62 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
     {
         private AVFormatContext* _formatContext = null;
         private AVCodecContext* _codecContext = null;
-        private AVCodec* _codec = null;
         private AVFrame* _frame = null;
-        private AVPacket* _packet = null;
         private int _videoStreamIndex = -1;
-        public int FrameCount = 0;
+        public int FrameCount { get; private set; }
+        private byte* _frameBuffer = null;
+
         const int AVERROR_EAGAIN = -11;
+        private const int AVERROR_EOF = -541478725;
 
-        private AVBufferRef* _hwDeviceContext = null;
-
-        private byte* _yuv420pBuffer;
-
-        private unsafe delegate AVPixelFormat GetFormatDelegate(AVCodecContext* ctx, AVPixelFormat* fmt);
-
-
-        public VideoFileReader(string videoPath, AVHWDeviceType hwDeviceType = AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2)
-        {
+        public VideoFileReader(string videoPath)
+        { 
             InitializeFormatContext(videoPath);
             InitializeVideoStream();
-            InitializeCodec(hwDeviceType);
-            AllocateFrameAndPacket();
-
+            AllocateFrame();
+            InitializeCodec();
             FrameCount = GetTotalFrames();
-            Logger.Log($"Total number of frames: {FrameCount}");
         }
         private int GetTotalFrames()
         {
-            // Ensure the video stream index is initialized
-            if (_videoStreamIndex == -1)
-            {
-                throw new InvalidOperationException("Video stream not initialized.");
-            }
-
-            // Get the stream corresponding to the video stream index
             var videoStream = _formatContext->streams[_videoStreamIndex];
+            long durationInMicroseconds = _formatContext->duration; // Duration in microseconds
 
-            // Check if nb_frames is available and return it
+            // If the video stream has the number of frames (nb_frames), use that if available
             if (videoStream->nb_frames > 0)
             {
-                return (int)videoStream->nb_frames; // Return the number of frames in the stream
+                return (int)videoStream->nb_frames;
             }
 
-            // If nb_frames is not available, we can try calculating it manually
-            // by decoding the video or using the duration of the video and the frame rate.
+            // Estimate the total frame count if nb_frames is not available
             double frameRate = videoStream->avg_frame_rate.num / (double)videoStream->avg_frame_rate.den;
-            double durationInSeconds = _formatContext->duration / 1000000.0; // Convert duration from microseconds to seconds
+            double durationInSeconds = durationInMicroseconds / 1000000.0;
 
-            // Calculate total frames manually
-            int totalFrames = (int)(frameRate * durationInSeconds);
-            return totalFrames;
+            // Calculate the total frame count as an integer, ensuring that it's at least 1 frame.
+            int totalFrames = (int)Math.Ceiling(frameRate * durationInSeconds);  // Use Ceil to round up to avoid fractional frames
+
+            // Ensure totalFrames is at least 1, as even a very short video should have at least one frame
+            return totalFrames > 0 ? totalFrames : 1;
         }
-        private AVFrame* ConvertPixelFormatToYUV420P(AVCodecContext* codecContext, AVFrame* inputFrame)
+        private int EstimateFrameCount()
         {
-            // Allocate a new frame for the converted format
-            AVFrame* yuv420pFrame = ffmpeg.av_frame_alloc();
-            if (yuv420pFrame == null)
-            {
-                throw new InvalidOperationException("Failed to allocate YUV420P frame.");
-            }
-
-            // Set frame properties for the YUV420P format
-            yuv420pFrame->width = codecContext->width;
-            yuv420pFrame->height = codecContext->height;
-            yuv420pFrame->format = (int)AVPixelFormat.AV_PIX_FMT_YUV420P;
-
-            // Allocate buffer for the YUV420P frame
-            int bufferSize = ffmpeg.av_image_get_buffer_size(AVPixelFormat.AV_PIX_FMT_YUV420P, codecContext->width, codecContext->height, 1);
-            byte* buffer = (byte*)ffmpeg.av_malloc((ulong)bufferSize);
-            if (buffer == null)
-            {
-                ffmpeg.av_frame_free(&yuv420pFrame);
-                throw new InvalidOperationException("Failed to allocate buffer for YUV420P frame.");
-            }
-
-            // Create temporary variables for the first 4 pointers
-            byte_ptrArray4 yuvData = new byte_ptrArray4();
-            int_array4 yuvLineSize = new int_array4();
-
-            // Copy relevant data from rgbaFrame->data and rgbaFrame->linesize
-            for (uint i = 0; i < 4; i++)
-            {
-                yuvData[i] = yuv420pFrame->data[i];
-                yuvLineSize[i] = yuv420pFrame->linesize[i];
-            }
-
-            ffmpeg.av_image_fill_arrays(
-                ref yuvData,
-                ref yuvLineSize,
-                buffer,
-                AVPixelFormat.AV_PIX_FMT_YUV420P,
-                codecContext->width,
-                codecContext->height,
-                1);
-
-            // Create a scaling context for the conversion
-            SwsContext* swsCtx = ffmpeg.sws_getContext(
-                codecContext->width, codecContext->height, codecContext->pix_fmt,
-                codecContext->width, codecContext->height, AVPixelFormat.AV_PIX_FMT_YUV420P,
-                ffmpeg.SWS_BILINEAR, null, null, null);
-
-            if (swsCtx == null)
-            {
-                ffmpeg.av_free(buffer);
-                ffmpeg.av_frame_free(&yuv420pFrame);
-                throw new InvalidOperationException("Failed to create SwsContext for YUV420P conversion.");
-            }
-
-            // Perform the conversion
-            ffmpeg.sws_scale(
-                swsCtx,
-                inputFrame->data,
-                inputFrame->linesize,
-                0,
-                codecContext->height,
-                yuv420pFrame->data,
-                yuv420pFrame->linesize);
-
-            // Free the scaling context
-            ffmpeg.sws_freeContext(swsCtx);
-
-            return yuv420pFrame;
+            var videoStream = _formatContext->streams[_videoStreamIndex];
+            double frameRate = videoStream->avg_frame_rate.num / (double)videoStream->avg_frame_rate.den;
+            double durationInSeconds = _formatContext->duration / 1000000.0;
+            return (int)(frameRate * durationInSeconds);
         }
         private void InitializeFormatContext(string videoPath)
         {
             fixed (AVFormatContext** formatContextPtr = &_formatContext)
             {
                 if (ffmpeg.avformat_open_input(formatContextPtr, videoPath, null, null) != 0)
-                {
                     throw new InvalidOperationException("Failed to open video file.");
-                }
             }
 
             if (ffmpeg.avformat_find_stream_info(_formatContext, null) < 0)
                 throw new InvalidOperationException("Failed to retrieve stream info.");
         }
+
         private void InitializeVideoStream()
         {
             for (int i = 0; i < _formatContext->nb_streams; i++)
@@ -157,180 +79,118 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             if (_videoStreamIndex == -1)
                 throw new InvalidOperationException("No video stream found.");
         }
-        private void InitializeCodec(AVHWDeviceType hwDeviceType)
-        {
-            _codec = ffmpeg.avcodec_find_decoder(_formatContext->streams[_videoStreamIndex]->codecpar->codec_id);
 
-            if (_codec == null)
+        private void AllocateFrame()
+        {
+            _frame = ffmpeg.av_frame_alloc();
+            if (_frame == null)
+                throw new InvalidOperationException("Failed to allocate memory for frame.");
+        }
+
+        private void AllocateFrameBuffer()
+        {
+            _frame = ffmpeg.av_frame_alloc();
+            if (_frame == null)
+                throw new InvalidOperationException("Failed to allocate memory for frame.");
+
+            int bufferSize = ffmpeg.av_image_get_buffer_size(AVPixelFormat.AV_PIX_FMT_RGB24, _formatContext->streams[_videoStreamIndex]->codecpar->width, _formatContext->streams[_videoStreamIndex]->codecpar->height, 1);
+            _frameBuffer = (byte*)ffmpeg.av_malloc((ulong)bufferSize);
+            if (_frameBuffer == null)
+                throw new InvalidOperationException("Failed to allocate memory for frame buffer.");
+        }
+        private void InitializeCodec()
+        {
+            var codec = ffmpeg.avcodec_find_decoder(_formatContext->streams[_videoStreamIndex]->codecpar->codec_id);
+            if (codec == null)
                 throw new InvalidOperationException("Failed to find video codec.");
 
-            _codecContext = ffmpeg.avcodec_alloc_context3(_codec);
+            _codecContext = ffmpeg.avcodec_alloc_context3(codec);
             if (_codecContext == null)
                 throw new InvalidOperationException("Failed to allocate codec context.");
 
             if (ffmpeg.avcodec_parameters_to_context(_codecContext, _formatContext->streams[_videoStreamIndex]->codecpar) < 0)
                 throw new InvalidOperationException("Failed to copy codec parameters to codec context.");
 
-            if (EnableHardwareAcceleration(hwDeviceType) == false)
-            {
-                Logger.Log("Hardware acceleration not supported for this codec, falling back to software decoding.");
-            }
-
-            //_codecContext->get_format = GetFormatCallback;
-
-            if (ffmpeg.avcodec_open2(_codecContext, _codec, null) < 0)
+            if (ffmpeg.avcodec_open2(_codecContext, codec, null) < 0)
                 throw new InvalidOperationException("Failed to open codec.");
         }
-
-        private static AVPixelFormat[] GetPixelFormats(AVPixelFormat* fmt)
+        private bool DecodeFrame(AVPacket* packet)
         {
-            var formats = new List<AVPixelFormat>();
-            while (*fmt != AVPixelFormat.AV_PIX_FMT_NONE)
+            int sendResult = ffmpeg.avcodec_send_packet(_codecContext, packet);
+            if (sendResult < 0)
             {
-                formats.Add(*fmt);
-                fmt++;
+                // Log error and exit
+                Logger.Log($"Error sending packet to codec: {sendResult}");
+                return false;
             }
-            return formats.ToArray();
-        }
 
-        private static AVPixelFormat GetFormatCallback(AVCodecContext* ctx, AVPixelFormat* fmt)
-        {
-            var formats = GetPixelFormats(fmt); // Convert the format array
-            Logger.Log($"Available pixel formats: {string.Join(", ", formats)}");
-
-            foreach (var format in formats)
+            // Receive frame
+            int receiveResult = ffmpeg.avcodec_receive_frame(_codecContext, _frame);
+            if (receiveResult < 0)
             {
-                if (format == AVPixelFormat.AV_PIX_FMT_NV12) // Hardware-accelerated format
+                if (receiveResult == AVERROR_EAGAIN)
                 {
-                    Logger.Log("Selecting hardware-accelerated pixel format: AV_PIX_FMT_NV12");
-                    return AVPixelFormat.AV_PIX_FMT_NV12;
+                    // Need more data, skip this packet
+                    return false;
                 }
+
+                // Log decoding errors
+                Logger.Log($"Error receiving frame: {receiveResult}");
+                return false;
             }
 
-            Logger.Log("No hardware-accelerated pixel format found. Falling back to default.");
-            return formats[0];
-        }
-
-        private bool EnableHardwareAcceleration(AVHWDeviceType hwDeviceType)
-        {
-            AVHWDeviceType[] availableDeviceTypes = {
-            AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2, // Windows (DXVA2)
-            AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA, // NVIDIA (CUDA)
-            AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI, // Linux (VAAPI)
-            AVHWDeviceType.AV_HWDEVICE_TYPE_VDPAU, // Linux (VDPAU)
-            AVHWDeviceType.AV_HWDEVICE_TYPE_QSV,   // Intel Quick Sync (QSV)
-            AVHWDeviceType.AV_HWDEVICE_TYPE_OPENCL, // OpenCL (cross-platform)
-            };
-            foreach (var deviceType in availableDeviceTypes)
-            {
-                fixed (AVBufferRef** hwDeviceContextPtr = &_hwDeviceContext)
-                {
-                    if (ffmpeg.av_hwdevice_ctx_create(hwDeviceContextPtr, deviceType, null, null, 0) >= 0)
-                    {
-                        Logger.Log($"Hardware acceleration enabled using {deviceType}.");
-                        _codecContext->hw_device_ctx = ffmpeg.av_buffer_ref(_hwDeviceContext);
-                        return true; // Success, hardware acceleration enabled.
-                    }
-                }
-            }
-            Logger.Log("Hardware acceleration not supported.");
-            return false; // Failed, hardware acceleration not available.
-        }
-        private void AllocateFrameAndPacket()
-        {
-            _frame = ffmpeg.av_frame_alloc();
-            _packet = ffmpeg.av_packet_alloc();
-
-            if (_frame == null || _packet == null)
-            {
-                throw new InvalidOperationException("Failed to allocate memory for frame or packet.");
-            }
+            return true;
         }
 
         public bool ReadNextFrame(out LEDMatrix frameImage)
         {
             frameImage = null;
 
-            if (ffmpeg.av_read_frame(_formatContext, _packet) < 0)
-                return false;
+            AVPacket* packet = ffmpeg.av_packet_alloc();
+            if (packet == null)
+                throw new InvalidOperationException("Failed to allocate packet.");
 
-            if (_packet->stream_index != _videoStreamIndex)
-                return false;
-
-            if (ffmpeg.avcodec_send_packet(_codecContext, _packet) < 0)
-                return false;
-
-            while (true)
+            try
             {
-                int receiveFrameResult = ffmpeg.avcodec_receive_frame(_codecContext, _frame);
-                if (receiveFrameResult == AVERROR_EAGAIN)
-                    continue;
-                else if (receiveFrameResult < 0)
-                    return false;
-
-                Logger.Log($"Frame received with format: {(AVPixelFormat)_frame->format}");
-
-                if (_frame->format == (int)AVPixelFormat.AV_PIX_FMT_NV12)
+                while (true)
                 {
-                    Logger.Log("Hardware frame received. Converting...");
-                    frameImage = ConvertToLEDMatrixFromHardwareFrame(_frame);
+                    int readResult = ffmpeg.av_read_frame(_formatContext, packet);
+
+                    if (readResult < 0)
+                    {
+                        // Handle EOF or read error
+                        if (readResult == AVERROR_EOF)
+                        {
+                            Logger.Log("AVERROR_EOF, end of video stream reached?");
+                            return false;
+                        }
+                        else if (readResult == AVERROR_EAGAIN)
+                        {
+                            Logger.Log("AVEERROR_EAGAIN, temporary error occurred, retrying..");
+                        }
+                        Logger.Log("Error reading frame from video stream");
+                    }
+
+                    if (packet->stream_index == _videoStreamIndex)
+                    {
+                        if (DecodeFrame(packet))
+                        {
+                            frameImage = ConvertToLEDMatrixOptimized(*_frame);
+                            return true;
+                        }
+                        else Logger.Log("Failed to decode frame");
+                    }
+
+                    ffmpeg.av_packet_unref(packet);
+
                 }
-                else
-                {
-                    Logger.Log("Software frame received.");
-                    frameImage = ConvertToLEDMatrixOptimized(*_frame);
-                }
-                return true;
+            }
+            finally
+            {
+                ffmpeg.av_packet_free(&packet);
             }
         }
-
-        private LEDMatrix ConvertToLEDMatrixFromHardwareFrame(AVFrame* frame)
-        {
-            // Ensure the frame format matches expectations
-            if (frame->format != (int)AVPixelFormat.AV_PIX_FMT_NV12)
-            {
-                throw new InvalidOperationException("Unsupported pixel format. Expected NV12.");
-            }
-
-            // Extract frame dimensions
-            int width = frame->width;
-            int height = frame->height;
-
-            // Create the LEDMatrix
-            var ledMatrix = new LEDMatrix(width, height);
-
-            // Extract pointers and strides
-            byte* yPlane = frame->data[0];
-            byte* uvPlane = frame->data[1];
-            int yStride = frame->linesize[0];
-            int uvStride = frame->linesize[1];
-
-            // Parallelize the processing of rows
-            Parallel.For(0, height, y =>
-            {
-                int uvRow = y / 2; // UV is subsampled by 2 in height
-                byte* yRow = yPlane + y * yStride;
-                byte* uvRowPtr = uvPlane + uvRow * uvStride;
-
-                for (int x = 0; x < width; x++)
-                {
-                    // Calculate UV indices for every second pixel
-                    int uvIndex = (x / 2) * 2;
-
-                    // Fetch Y, U, and V values
-                    byte yValue = yRow[x];
-                    byte uValue = uvRowPtr[uvIndex];
-                    byte vValue = uvRowPtr[uvIndex + 1];
-
-                    // Convert YUV to RGB and set pixel color
-                    ledMatrix.SetPixelColor(x, y, FastYuvToRgb(yValue, uValue, vValue));
-                }
-            });
-
-            return ledMatrix;
-        }
-
-        // Optimized YUV to RGB conversion
+   
         private static Rgba32 FastYuvToRgb(byte y, byte u, byte v)
         {
             // Precompute constants
@@ -373,30 +233,31 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             byte* dataU = sourceFrame.data[1];
             byte* dataV = sourceFrame.data[2];
 
-            // Use parallelism for rows
+            // Use parallelism for processing rows
             Parallel.For(0, height, y =>
             {
-                int yHalf = y / 2;
                 for (int x = 0; x < width; x++)
                 {
-                    int xHalf = x / 2;
-
                     // Calculate indices for Y, U, and V planes
-                    int yIndex = y * linesizeY + x;
-                    int uIndex = yHalf * linesizeU + xHalf;
-                    int vIndex = yHalf * linesizeV + xHalf;
+                    int yIndex = y * linesizeY + x;  // Y plane
+                    int uIndex = (y / 2) * linesizeU + (x / 2); // U plane (subsampled)
+                    int vIndex = (y / 2) * linesizeV + (x / 2); // V plane (subsampled)
 
-                    // Fetch YUV values
-                    int c = dataY[yIndex] - offsetY;
-                    int d = dataU[uIndex] - offsetUV;
-                    int e = dataV[vIndex] - offsetUV;
+                    // Fetch Y, U, V values
+                    byte yValue = dataY[yIndex];
+                    byte uValue = dataU[uIndex];
+                    byte vValue = dataV[vIndex];
 
-                    // Compute RGB values using optimized formula
+                    // Convert YUV to RGB
+                    int c = yValue - offsetY;
+                    int d = uValue - offsetUV;
+                    int e = vValue - offsetUV;
+
                     byte r = ClampToByte((coeffY * c + coeffR * e + 128) >> 8);
                     byte g = ClampToByte((coeffY * c - coeffG1 * d - coeffG2 * e + 128) >> 8);
                     byte b = ClampToByte((coeffY * c + coeffB * d + 128) >> 8);
 
-                    // Update LEDMatrix pixel
+                    // Set the RGB value in the LEDMatrix
                     ledMatrix.SetPixelColor(x, y, new Rgba32(r, g, b));
                 }
             });
@@ -430,25 +291,22 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
 
         public void Dispose()
         {
-            // Ensure the pointers are pinned before passing them to unmanaged FFmpeg functions
-            fixed (AVPacket** packetPtr = &_packet)
+            if (_frame != null)
             {
-                ffmpeg.av_packet_free(packetPtr);
+                fixed (AVFrame** framePtr = &_frame)
+                    ffmpeg.av_frame_free(framePtr);
             }
 
-            fixed (AVFrame** framePtr = &_frame)
+            if (_codecContext != null)
             {
-                ffmpeg.av_frame_free(framePtr);
+                fixed (AVCodecContext** codecContextPtr = &_codecContext)
+                    ffmpeg.avcodec_free_context(codecContextPtr);
             }
 
-            fixed (AVCodecContext** codecContextPtr = &_codecContext)
+            if (_formatContext != null)
             {
-                ffmpeg.avcodec_free_context(codecContextPtr);
-            }
-
-            fixed (AVFormatContext** formatContextPtr = &_formatContext)
-            {
-                ffmpeg.avformat_close_input(formatContextPtr);
+                fixed (AVFormatContext** formatContextPtr = &_formatContext)
+                    ffmpeg.avformat_close_input(formatContextPtr);
             }
 
             GC.SuppressFinalize(this);
