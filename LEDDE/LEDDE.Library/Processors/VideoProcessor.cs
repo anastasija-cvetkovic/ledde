@@ -27,58 +27,24 @@ namespace LEDDE.Library.Processors
             int totalFrames = 0;
             int processedFrames = 0;
 
+            int chunk_size = 10;
+
             using (var videoFile = new VideoFileReader(videoPath))
             {
                 Logger.Log($"Video file opened - {videoPath}.");
                 totalFrames = (int)videoFile.FrameCount;
 
-                var frameTasks = new List<Task>();
-                int processorCount = Environment.ProcessorCount;
-                SemaphoreSlim semaphore = new(processorCount); // Adjust as needed for parallelism
 
-                // Timer to update progress periodically
-                var progressUpdateTask = Task.Run(async () =>
-                {
-                    while (processedFrames < totalFrames)
-                    {
-                        int progress = (int)((processedFrames / (float)totalFrames) * 100);
-                        progressCallback?.Invoke(progress);
-                        await Task.Delay(500); // Update progress every second
-                    }
-                });
-
-                // Parallel frame processing
+                // Read frames synchronously, but process them asynchronously
                 while (videoFile.ReadNextFrame(out var frame))
-                {
-                    frameTasks.Add(Task.Run(async () =>
-                    {
-                        await semaphore.WaitAsync();
-                        try
-                        {
-                            // Process frame and add to the list
-                            lock (videoMatrix)
-                            {
-                                videoMatrix.Add(frame);
-                            }
+                {                            
+                     videoMatrix.Add(frame);
+                    processedFrames++;
+                    int progress = (int)((processedFrames / (float)totalFrames) * 100);
+                    progressCallback?.Invoke(progress);
 
-                            // Increment processed frame count
-                            Interlocked.Increment(ref processedFrames);
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    }));
                 }
-
-                // Wait for all frame processing to complete
-                Task.WhenAll(frameTasks).Wait();
-
-                // Wait for the progress update task to finish
-                progressUpdateTask.Wait();
             }
-
-            // Ensure final progress is reported as 100%
             progressCallback?.Invoke(100);
 
             return videoMatrix;

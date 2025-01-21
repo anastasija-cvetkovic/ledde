@@ -17,6 +17,8 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
         const int AVERROR_EAGAIN = -11;
         private const int AVERROR_EOF = -541478725;
 
+        private AVBufferRef* _hwDeviceContext = null;
+
         public VideoFileReader(string videoPath)
         { 
             InitializeFormatContext(videoPath);
@@ -24,6 +26,7 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             AllocateFrame();
             InitializeCodec();
             FrameCount = GetTotalFrames();
+            Logger.Log($"number of read frames is {FrameCount}");
         }
         private int GetTotalFrames()
         {
