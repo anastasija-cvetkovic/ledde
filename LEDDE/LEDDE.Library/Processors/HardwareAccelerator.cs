@@ -4,52 +4,55 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using FFmpeg.AutoGen;
+using LEDDE.Library.Processors.AutoGenHelpers;
 
 namespace LEDDE.Library.Processors
 {
     public class HardwareAccelerator
     {
-        private readonly AVHWDeviceType[] preferredDecoders = new[]
-        {
+        private readonly AVHWDeviceType[] preferredDecoders =
+        [
             AVHWDeviceType.AV_HWDEVICE_TYPE_CUDA,
             AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2,
             AVHWDeviceType.AV_HWDEVICE_TYPE_VAAPI,
             AVHWDeviceType.AV_HWDEVICE_TYPE_QSV
-        };
+        ];
+
+        private List<AVHWDeviceType>? _availableDecoders;
+        public List<AVHWDeviceType> AvailableDecoders => GetAvailableHWDecoders();
+        
+        private List<AVHWDeviceType> GetAvailableHWDecoders()
+        {
+            if (_availableDecoders == null)
+            {
+                _availableDecoders = [];
+                var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
+                while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
+                    _availableDecoders.Add(type);
+            }
+            return _availableDecoders;
+        }
         public AVHWDeviceType ConfigureHWDecoder()
         {
-            var availableHWDecoders = GetAvailableHWDecoders();
 
-            if (!availableHWDecoders.Any())
+            if (AvailableDecoders.Count == 0)
             {
-                Console.WriteLine("No hardware decoders available. Falling back to software decoding.");
+                Logger.Log("No hardware decoders available. Falling back to software decoding.");
                 return AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
             }
 
             foreach (var preferred in preferredDecoders)
             {
-                if (availableHWDecoders.Contains(preferred))
+                if (AvailableDecoders.Contains(preferred))
                 {
-                    Console.WriteLine($"Using hardware decoder: {preferred}");
+                    Logger.Log($"Using hardware decoder: {preferred}");
                     return preferred;
                 }
             }
 
-            var fallback = availableHWDecoders.First();
-            Console.WriteLine($"Using fallback hardware decoder: {fallback}");
+            var fallback = AvailableDecoders.First();
+            Logger.Log($"Using fallback hardware decoder: {fallback}");
             return fallback;
-        }
-        private static List<AVHWDeviceType> GetAvailableHWDecoders()
-        {
-            var availableHWDecoders = new List<AVHWDeviceType>();
-            var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-
-            while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
-            {
-                availableHWDecoders.Add(type);
-            }
-
-            return availableHWDecoders;
         }
         public static AVPixelFormat GetHWPixelFormat(AVHWDeviceType hWDevice)
         {

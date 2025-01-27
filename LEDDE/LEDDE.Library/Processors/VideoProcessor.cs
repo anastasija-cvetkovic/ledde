@@ -106,40 +106,6 @@ namespace LEDDE.Library.Processors
         }
         #endregion
 
-        #region old methods
-        public static void ProcessVideoOld(string videoPath)
-        {
-            // Initialize FFmpeg libraries
-            InitializeFFmpeg();
-
-            int c = 0;
-
-            // Open video file
-            using (var videoFile = new VideoFileReader(videoPath))
-            {
-                string videoFileName = Path.GetFileNameWithoutExtension(videoPath);
-                string outputFolder = Path.Combine(Directory.GetCurrentDirectory(), videoFileName);
-                Directory.CreateDirectory(outputFolder);
-
-                int frameNumber = 0;
-                while (videoFile.ReadNextFrame(out var frame,ref c))
-                {
-                    // Convert frame to LEDMatrix
-                    LEDMatrix frameMatrix = frame;
-
-                    // Scale the frame (optional: customize scaling resolution)
-                    //LEDMatrix scaledMatrix = ImageProcessor.ScaleLEDMatrix(frameMatrix, 32, 32, ScalingAlgorithms.NearestNeighborInterpolate);
-
-                    // Save the scaled frame as ASCII
-                    //scaledMatrix.SaveAsASCII(outputFolder, $"frame_{frameNumber}");
-
-                    frameNumber++;
-                }
-            }
-        }
-        #endregion
-
-
     }
     
 }
