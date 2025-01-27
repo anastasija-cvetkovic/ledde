@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using Avalonia.Logging;
+using LEDDE.Library.Scaling;
 
 namespace LEDDE.UI.Views
 {
@@ -101,7 +102,22 @@ namespace LEDDE.UI.Views
 
         private async void StartSimulationButton_Click(object sender, RoutedEventArgs e)
         {
-            // Retrieve the new width and height from the text boxes
+            // Retrieve the selected scaling algorithm
+            var selectedAlgorithm = (ScalingAlgorithmSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            if (selectedAlgorithm == null)
+            {
+                StatusText.Text = "Please select a scaling algorithm.";
+                return;
+            }
+
+            // Define the delegate for the scaling algorithm
+            ScalingAlgorithms.InterpolationAlgorithm scalingAlgorithm = selectedAlgorithm switch
+            {
+                "NearestNeighbor" => ScalingAlgorithms.NearestNeighborInterpolate,
+                "Bilinear" => ScalingAlgorithms.BilinearInterpolate,
+                _ => ScalingAlgorithms.NearestNeighborInterpolate // Default fallback
+            };
+
             if (!int.TryParse(WidthInput.Text, out int newWidth))
             {
                 StatusText.Text = "Invalid width input!";
@@ -129,7 +145,7 @@ namespace LEDDE.UI.Views
                     ProgressBar.Value = 0; // Reset progress bar
                 });
 
-                _image = ImageProcessor.ProcessImage(_image, newWidth, newHeight);
+                _image = ImageProcessor.ProcessImage(_image, newWidth, newHeight, scalingAlgorithm);
 
                 LedDisplayView.Source = ToAvaloniaBitmap(_image);
                 LedDisplayView.Width = Math.Min(newWidth, LedDisplayView.MaxWidth);
@@ -149,13 +165,11 @@ namespace LEDDE.UI.Views
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     StatusText.Text = "Scaling video...";
-                    ProgressBar.Value = 0; // Reset progress bar
+                    ProgressBar.Value = 0; 
                 });
-
-                // Perform the scaling operation on a background thread
                 await Task.Run(() =>
                 {
-                    _videoFrames = VideoProcessor.ScaleVideo(_videoFrames, newWidth, newHeight, progress =>
+                    _videoFrames = VideoProcessor.ScaleVideo(_videoFrames, newWidth, newHeight, scalingAlgorithm, progress =>
                     {
                         // Update the progress bar on the UI thread
                         Dispatcher.UIThread.InvokeAsync(() => ProgressBar.Value = progress);
@@ -198,7 +212,7 @@ namespace LEDDE.UI.Views
                         currentFrame++;
 
                         // Optionally, add a small delay to simulate frame rate
-                        await Task.Delay(50);  // Adjust this delay to simulate frame rate
+                        await Task.Delay(30);  // Adjust this delay to simulate frame rate
                     }
 
                     // Update status after the video is done

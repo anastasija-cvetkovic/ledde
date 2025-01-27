@@ -145,7 +145,7 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             return true;
         }
 
-        public bool ReadNextFrame(out LEDMatrix frameImage)
+        public bool ReadNextFrame(out LEDMatrix frameImage, ref int c)
         {
             frameImage = null;
 
@@ -157,6 +157,9 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
             {
                 while (true)
                 {
+                    Logger.Log($"{c}");
+                    c++;
+
                     int readResult = ffmpeg.av_read_frame(_formatContext, packet);
 
                     if (readResult < 0)
@@ -178,6 +181,7 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
                     {
                         if (DecodeFrame(packet))
                         {
+
                             frameImage = ConvertToLEDMatrixOptimized(*_frame);
                             return true;
                         }
@@ -314,5 +318,12 @@ namespace LEDDE.Library.Processors.AutoGenHelpers
 
             GC.SuppressFinalize(this);
         }
+
+        public unsafe AVFrame* GetLastDecodedFrame()
+        {
+            return _frame;
+        }
+
     }
+
 }

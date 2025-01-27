@@ -4,6 +4,7 @@ using LEDDE.Library.LED;
 using LEDDE.Library.Scaling;
 using Renderer = LEDDE.Library.LED.LEDMatrixRenderer;
 using Validator = LEDDE.Library.Validators.ResourceValidator;
+using static LEDDE.Library.Scaling.ScalingAlgorithms;
 
 namespace LEDDE.Library.Processors
 {
@@ -18,7 +19,7 @@ namespace LEDDE.Library.Processors
             return Renderer.ToLEDMatrix(image);
         }
 
-        public static LEDMatrix ScaleLEDMatrix(LEDMatrix originalMatrix, int newWidth, int newHeight, ScalingAlgorithms.InterpolationAlgorithm interpolationAlgorithm)
+        public static LEDMatrix ScaleLEDMatrix(LEDMatrix originalMatrix, int newWidth, int newHeight, InterpolationAlgorithm interpolationAlgorithm)
         {
             int originalWidth=originalMatrix.Width;
             int originalHeight=originalMatrix.Height;
@@ -55,14 +56,14 @@ namespace LEDDE.Library.Processors
             return scaledMatrix;
         }
 
-        public static LEDMatrix ProcessImage(LEDMatrix loadedMatrix, int newWidth, int newHeight)
+        public static LEDMatrix ProcessImage(LEDMatrix loadedMatrix, int newWidth, int newHeight, InterpolationAlgorithm interpolationAlgorithm)
         {
             if (newWidth <= 0 || newHeight <= 0)
             {
                 throw new ArgumentException("Matrix dimensions must be greater than zero");
             }
 
-            LEDMatrix scaledMatrix = ScaleLEDMatrix(loadedMatrix,newWidth,newHeight,ScalingAlgorithms.BilinearInterpolate);
+            LEDMatrix scaledMatrix = ScaleLEDMatrix(loadedMatrix,newWidth,newHeight, interpolationAlgorithm);
 
             return scaledMatrix;
         }

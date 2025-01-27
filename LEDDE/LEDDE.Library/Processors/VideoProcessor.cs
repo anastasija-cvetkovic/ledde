@@ -27,22 +27,29 @@ namespace LEDDE.Library.Processors
             int totalFrames = 0;
             int processedFrames = 0;
 
-            int chunk_size = 10;
 
             using (var videoFile = new VideoFileReader(videoPath))
             {
                 Logger.Log($"Video file opened - {videoPath}.");
                 totalFrames = (int)videoFile.FrameCount;
 
+                /* int chunksize = 10;
+                 int numOfChunks = (int) Math.Ceiling((double) (totalFrames / chunksize));
 
-                // Read frames synchronously, but process them asynchronously
-                while (videoFile.ReadNextFrame(out var frame))
+
+                 Parallel.For(0, numOfChunks, i =>
+                 {
+
+                 });
+                */
+
+                int c = 0;
+                while (videoFile.ReadNextFrame(out var frame, ref c))
                 {                            
-                     videoMatrix.Add(frame);
+                    videoMatrix.Add(frame);
                     processedFrames++;
                     int progress = (int)((processedFrames / (float)totalFrames) * 100);
                     progressCallback?.Invoke(progress);
-
                 }
             }
             progressCallback?.Invoke(100);
@@ -50,7 +57,7 @@ namespace LEDDE.Library.Processors
             return videoMatrix;
         }
 
-        public static List<LEDMatrix> ScaleVideo(List<LEDMatrix> matrix, int newWidth, int newHeight, Action<int> progressCallback)
+        public static List<LEDMatrix> ScaleVideo(List<LEDMatrix> matrix, int newWidth, int newHeight, ScalingAlgorithms.InterpolationAlgorithm scalingAlgorithm, Action<int> progressCallback)
         {
             InitializeFFmpeg();
 
@@ -58,7 +65,7 @@ namespace LEDDE.Library.Processors
 
             Parallel.ForEach(matrix, (frame, state, index) =>
             {
-                LEDMatrix scaledFrame = ImageProcessor.ScaleLEDMatrix(frame, newWidth, newHeight, ScalingAlgorithms.NearestNeighborInterpolate);
+                LEDMatrix scaledFrame = ImageProcessor.ScaleLEDMatrix(frame, newWidth, newHeight, scalingAlgorithm);
 
                 matrix[(int)index] = scaledFrame;
 
@@ -78,10 +85,11 @@ namespace LEDDE.Library.Processors
         public static IEnumerable<LEDMatrix> StreamVideoFrames(string videoPath)
         {
             InitializeFFmpeg();
+            int c = 0;
 
             using (var videoFile = new VideoFileReader(videoPath))
             {
-                while (videoFile.ReadNextFrame(out var frame))
+                while (videoFile.ReadNextFrame(out var frame, ref c))
                 {
                     yield return frame;
                 }
@@ -104,6 +112,8 @@ namespace LEDDE.Library.Processors
             // Initialize FFmpeg libraries
             InitializeFFmpeg();
 
+            int c = 0;
+
             // Open video file
             using (var videoFile = new VideoFileReader(videoPath))
             {
@@ -112,7 +122,7 @@ namespace LEDDE.Library.Processors
                 Directory.CreateDirectory(outputFolder);
 
                 int frameNumber = 0;
-                while (videoFile.ReadNextFrame(out var frame))
+                while (videoFile.ReadNextFrame(out var frame,ref c))
                 {
                     // Convert frame to LEDMatrix
                     LEDMatrix frameMatrix = frame;

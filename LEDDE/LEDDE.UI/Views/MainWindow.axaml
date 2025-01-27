@@ -33,10 +33,9 @@
 			<Label Margin="0,5,0,0">Height:</Label>
 			<TextBox Name="HeightInput"  Width="80"/>
 			<ComboBox Name="ScalingAlgorithmSelector" Width="220" SelectedIndex="0">
-				<ComboBoxItem Content="Select a Scaling Algorithm" IsEnabled="False" />
-				<ComboBoxItem Content="Nearest Neighbor"/>
-				<ComboBoxItem Content="Bilinear"/>
-				<ComboBoxItem Content="Bicubic"/>
+				<ComboBoxItem Content="Select a Scaling Algorithm" IsEnabled="False" Tag="" />
+				<ComboBoxItem Content="Nearest Neighbor" Tag="NearestNeighbor" />
+				<ComboBoxItem Content="Bilinear Interpolation" Tag="Bilinear"/>
 			</ComboBox>
 			
 			<Button Name="StartSimulationButton" Content="Simulate" Click="StartSimulationButton_Click"
